@@ -22,8 +22,7 @@ from .serializers import (
 )
 
 
-# --- Doctors ---------------------------------------------------------------
-
+#  Doctors
 class DoctorListView(generics.ListCreateAPIView):
     """
     GET  /api/doctors/  (optional ?specialty= & ?hospital= filters) — list
@@ -52,7 +51,7 @@ class DoctorDetailView(generics.RetrieveAPIView):
     serializer_class = DoctorSerializer
 
 
-# --- Hospitals ---------------------------------------------------------------
+#  Hospitals 
 
 class HospitalListView(generics.ListCreateAPIView):
     """
@@ -78,7 +77,7 @@ class HospitalDetailView(generics.RetrieveAPIView):
     serializer_class = HospitalSerializer
 
 
-# --- Health Packages ---------------------------------------------------------
+# Health Packages 
 
 class HealthPackageListView(generics.ListCreateAPIView):
     """
@@ -97,7 +96,7 @@ class HealthPackageDetailView(generics.RetrieveAPIView):
     serializer_class = HealthPackageSerializer
 
 
-# --- Appointments --------------------------------------------------------
+# Appointments 
 
 class AppointmentListCreateView(generics.ListCreateAPIView):
     """
@@ -180,7 +179,7 @@ class AppointmentStatusUpdateView(APIView):
         return Response(AppointmentSerializer(appointment).data)
 
 
-# --- Health check ------------------------------------------------------------
+# Health check
 
 class HealthCheckView(APIView):
     def get(self, request):
