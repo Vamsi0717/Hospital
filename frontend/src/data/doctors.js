@@ -1,42 +1,4 @@
-// const doctors = [
-//   {
-//     id: 1,
-//     name: "Dr. Arun Kumar",
-//     specialty: "Cardiology",
-//     experience: "15 Years Experience",
-//     hospital: "Medicare Hyderabad",
-//     image: "https://drarunkumar.co.in/wp-content/uploads/sites/15/2024/12/HD_image.jpg",
-//   },
 
-//   {
-//     id: 2,
-//     name: "Dr. Priya Sharma",
-//     specialty: "Neurology",
-//     experience: "12 Years Experience",
-//     hospital: "Medicare Chennai",
-//     image: "https://images.apollo247.in/doctors/15b2c411-05bc-48e7-a61f-fda00856e7ac-1767093285487.jpeg",
-//   },
-
-//   {
-//     id: 3,
-//     name: "Dr. Rahul Reddy",
-//     specialty: "Orthopedics",
-//     experience: "18 Years Experience",
-//     hospital: "Medicare Bengaluru",
-//     image: "https://www.bangalore.yenepoya.edu.in/admin/photo/1/faculty/43/1499.jpg",
-//   },
-
-//   {
-//     id: 4,
-//     name: "Dr. Sneha Rao",
-//     specialty: "Pediatrics",
-//     experience: "10 Years Experience",
-//     hospital: "Medicare Hyderabad",
-//     image: "https://rxdx.in/wp-content/uploads/2021/07/anusha-gutta-300x300.jpg",
-//   },
-// ];
-
-// export default doctors;
 
 
 const doctors = [

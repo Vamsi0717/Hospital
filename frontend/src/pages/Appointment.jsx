@@ -2,11 +2,7 @@ import React, {
   useState,
 } from "react";
 
-import {
-  createAppointment,
-  sendOtp,
-  verifyOtp,
-} from "../services/api";
+import { bookAppointment, sendOtp, verifyOtp } from "../services/api";
 
 function Appointment() {
 
@@ -24,145 +20,55 @@ function Appointment() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  // --- Phone validation state ---
-  const [phoneError, setPhoneError] = useState("");
-
-  // --- OTP verification state ---
   const [otpCode, setOtpCode] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
-  const [otpToken, setOtpToken] = useState("");
   const [otpSending, setOtpSending] = useState(false);
   const [otpVerifying, setOtpVerifying] = useState(false);
-  const [otpMsg, setOtpMsg] = useState("");
   const [otpError, setOtpError] = useState("");
+  const [otpMessage, setOtpMessage] = useState("");
 
-
-  // ==========================================
-  // HANDLE INPUT CHANGE
-  // ==========================================
 
   const handleChange = (e) => {
 
-    const {
-      name,
-      value,
-    } = e.target;
-
-
-    // ========================================
-    // PHONE NUMBER
-    // ========================================
-
-    if (name === "phone") {
-
-      // Allow numbers only
-      const onlyNumbers = value.replace(/\D/g, "");
-
-      // Maximum 10 digits
-      const phone = onlyNumbers.slice(0, 10);
-
-      setFormData({
-        ...formData,
-        phone,
-      });
-
-      // Reset phone error while typing
-      if (phone.length === 0) {
-
-        setPhoneError("");
-
-      } else if (phone.length < 10) {
-
-        setPhoneError(
-          "Please enter a 10-digit mobile number."
-        );
-
-      } else {
-
-        // Exactly 10 digits
-        setPhoneError("");
-
-      }
-
-      return;
-    }
-
-
-    // ========================================
-    // OTHER FIELDS
-    // ========================================
-
     setFormData({
       ...formData,
-      [name]: value,
+      [e.target.name]: e.target.value,
     });
 
-
-    // Any change to email invalidates
-    // previous OTP verification.
-
-    if (name === "email") {
-
-      setOtpSent(false);
+    // If phone number changes after verifying, require re-verification
+    if (e.target.name === "phone" && otpVerified) {
       setOtpVerified(false);
-      setOtpToken("");
+      setOtpSent(false);
       setOtpCode("");
-      setOtpMsg("");
-      setOtpError("");
-
     }
 
   };
 
 
-  // ==========================================
-  // SEND OTP
-  // ==========================================
-
   const handleSendOtp = async () => {
 
-    if (!formData.email) {
+    setOtpError("");
+    setOtpMessage("");
 
-      setOtpError(
-        "Enter your email first."
-      );
-
+    if (!formData.phone) {
+      setOtpError("Please enter your phone number first.");
       return;
     }
 
-
     setOtpSending(true);
-    setOtpError("");
-    setOtpMsg("");
-
 
     try {
 
-      const response = await sendOtp(
-        formData.email
-      );
-
-
+      const response = await sendOtp(formData.phone);
       setOtpSent(true);
-
-      setOtpMsg(
-        response.data.message ||
-        "OTP sent. Check your email."
-      );
+      setOtpMessage(response.data.message || "OTP sent successfully.");
 
     } catch (error) {
 
       console.error(error);
-
-      const details =
-        error.response?.data?.details;
-
-
       setOtpError(
-        details
-          ? details.join(", ")
-          : "Could not send OTP. Please try again."
+        error.response?.data?.error || "Failed to send OTP. Please try again."
       );
 
     } finally {
@@ -174,57 +80,29 @@ function Appointment() {
   };
 
 
-  // ==========================================
-  // VERIFY OTP
-  // ==========================================
-
   const handleVerifyOtp = async () => {
 
+    setOtpError("");
+    setOtpMessage("");
+
     if (!otpCode) {
-
-      setOtpError(
-        "Enter the OTP you received."
-      );
-
+      setOtpError("Please enter the OTP.");
       return;
     }
 
-
     setOtpVerifying(true);
-    setOtpError("");
-
 
     try {
 
-      const response = await verifyOtp(
-        formData.email,
-        otpCode
-      );
-
-
+      await verifyOtp(formData.phone, otpCode);
       setOtpVerified(true);
-
-      setOtpToken(
-        response.data.otp_token
-      );
-
-      setOtpMsg(
-        response.data.message ||
-        "Email verified."
-      );
+      setOtpMessage("Phone number verified successfully.");
 
     } catch (error) {
 
       console.error(error);
-
-      const details =
-        error.response?.data?.details;
-
-
       setOtpError(
-        details
-          ? details.join(", ")
-          : "OTP verification failed. Please try again."
+        error.response?.data?.error || "Invalid or expired OTP. Please try again."
       );
 
     } finally {
@@ -236,70 +114,26 @@ function Appointment() {
   };
 
 
-  // ==========================================
-  // SUBMIT APPOINTMENT
-  // ==========================================
-
   const handleSubmit = async (e) => {
 
     e.preventDefault();
 
-    setErrorMsg("");
-
-
-    // ========================================
-    // PHONE VALIDATION
-    // ========================================
-
-    if (formData.phone.length !== 10) {
-
-      setPhoneError(
-        "Please enter a valid 10-digit mobile number."
-      );
-
-      setErrorMsg(
-        "Please enter a valid 10-digit mobile number."
-      );
-
-      return;
-    }
-
-
-    // ========================================
-    // EMAIL OTP VALIDATION
-    // ========================================
-
     if (!otpVerified) {
-
-      setErrorMsg(
-        "Please verify your email with the OTP before booking."
-      );
-
+      setErrorMsg("Please verify your phone number with OTP before booking.");
       return;
     }
-
 
     setSubmitting(true);
-
+    setErrorMsg("");
 
     try {
 
-      const response =
-        await createAppointment({
-          ...formData,
-          otp_token: otpToken,
-        });
-
+      const response = await bookAppointment(formData);
 
       alert(
         response.data.message ||
         "Appointment request submitted successfully!"
       );
-
-
-      // ======================================
-      // RESET FORM
-      // ======================================
 
       setFormData({
         name: "",
@@ -312,28 +146,21 @@ function Appointment() {
         message: "",
       });
 
-
-      setPhoneError("");
-
-      setOtpCode("");
       setOtpSent(false);
       setOtpVerified(false);
-      setOtpToken("");
-      setOtpMsg("");
-      setOtpError("");
+      setOtpCode("");
+      setOtpMessage("");
 
     } catch (error) {
 
       console.error(error);
 
-      const details =
-        error.response?.data?.details;
-
+      const details = error.response?.data?.details;
 
       setErrorMsg(
         details
           ? details.join(", ")
-          : error.response?.data?.message ||
+          : error.response?.data?.error ||
             "Something went wrong while booking your appointment. Please try again."
       );
 
@@ -348,10 +175,6 @@ function Appointment() {
 
   return (
     <>
-
-      {/* =====================================
-          HEADER
-      ====================================== */}
 
       <div
         className="
@@ -371,10 +194,6 @@ function Appointment() {
       </div>
 
 
-      {/* =====================================
-          FORM SECTION
-      ====================================== */}
-
       <section className="bg-[#f7fafb] px-[5%] py-16">
 
         <form
@@ -389,12 +208,7 @@ function Appointment() {
           "
         >
 
-          {/* =================================
-              GENERAL ERROR
-          ================================== */}
-
           {errorMsg && (
-
             <div
               className="
                 mb-5
@@ -409,7 +223,6 @@ function Appointment() {
             >
               {errorMsg}
             </div>
-
           )}
 
 
@@ -417,13 +230,10 @@ function Appointment() {
             className="
               grid
               gap-5
+
               md:grid-cols-2
             "
           >
-
-            {/* =================================
-                PATIENT NAME
-            ================================== */}
 
             <Input
               label="Patient Name"
@@ -434,276 +244,151 @@ function Appointment() {
             />
 
 
-            {/* =================================
-                EMAIL + OTP
-            ================================== */}
+            <Input
+              label="Email"
+              name="email"
+              type="email"
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="Enter your email"
+            />
+
 
             <div>
 
-              <Input
-                label="Email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="Enter your email"
-              />
-
-
-              {otpVerified ? (
-
-                <p
-                  className="
-                    mt-2
-                    text-sm
-                    font-medium
-                    text-green-600
-                  "
-                >
-                  ✓ Email verified
-                </p>
-
-              ) : (
-
-                <div className="mt-2">
-
-                  {!otpSent ? (
-
-                    <button
-                      type="button"
-                      onClick={handleSendOtp}
-                      disabled={
-                        otpSending ||
-                        !formData.email
-                      }
-                      className="
-                        rounded
-                        border
-                        border-[#087f9d]
-                        px-3
-                        py-1.5
-                        text-sm
-                        font-semibold
-                        text-[#087f9d]
-                        hover:bg-[#e6f4f7]
-                        disabled:cursor-not-allowed
-                        disabled:opacity-60
-                      "
-                    >
-                      {otpSending
-                        ? "Sending..."
-                        : "Send OTP"}
-                    </button>
-
-                  ) : (
-
-                    <div
-                      className="
-                        flex
-                        flex-wrap
-                        items-center
-                        gap-2
-                      "
-                    >
-
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={6}
-                        value={otpCode}
-                        onChange={(e) => {
-
-                          const value =
-                            e.target.value.replace(
-                              /\D/g,
-                              ""
-                            );
-
-                          setOtpCode(value);
-
-                        }}
-                        placeholder="Enter OTP"
-                        className="
-                          w-32
-                          rounded
-                          border
-                          border-gray-300
-                          p-2
-                          text-sm
-                          outline-none
-                          focus:border-[#087f9d]
-                        "
-                      />
-
-
-                      <button
-                        type="button"
-                        onClick={handleVerifyOtp}
-                        disabled={
-                          otpVerifying ||
-                          !otpCode
-                        }
-                        className="
-                          rounded
-                          bg-[#087f9d]
-                          px-3
-                          py-2
-                          text-sm
-                          font-semibold
-                          text-white
-                          hover:bg-[#075d72]
-                          disabled:cursor-not-allowed
-                          disabled:opacity-60
-                        "
-                      >
-                        {otpVerifying
-                          ? "Verifying..."
-                          : "Verify"}
-                      </button>
-
-
-                      <button
-                        type="button"
-                        onClick={handleSendOtp}
-                        disabled={otpSending}
-                        className="
-                          text-sm
-                          font-medium
-                          text-[#087f9d]
-                          underline
-                          disabled:opacity-60
-                        "
-                      >
-                        {otpSending
-                          ? "Sending..."
-                          : "Resend"}
-                      </button>
-
-                    </div>
-
-                  )}
-
-
-                  {otpMsg && (
-
-                    <p
-                      className="
-                        mt-1
-                        text-xs
-                        text-gray-500
-                      "
-                    >
-                      {otpMsg}
-                    </p>
-
-                  )}
-
-
-                  {otpError && (
-
-                    <p
-                      className="
-                        mt-1
-                        text-xs
-                        text-red-600
-                      "
-                    >
-                      {otpError}
-                    </p>
-
-                  )}
-
-                </div>
-
-              )}
-
-            </div>
-
-
-            {/* =================================
-                PHONE NUMBER
-            ================================== */}
-
-            <div>
-
-              <label
-                className="
-                  mb-2
-                  block
-                  text-sm
-                  font-semibold
-                "
-              >
+              <label className="mb-2 block text-sm font-semibold">
                 Phone
               </label>
 
+              <div className="flex gap-2">
 
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                placeholder="Enter 10-digit mobile number"
-                maxLength={10}
-                inputMode="numeric"
-                required
-                className={`
-                  w-full
-                  rounded
-                  border
-                  p-3
-                  outline-none
-                  ${
-                    phoneError
-                      ? "border-red-400 focus:border-red-500"
-                      : "border-gray-300 focus:border-[#087f9d]"
-                  }
-                `}
-              />
-
-
-              {/* Phone validation message */}
-
-              {phoneError && (
-
-                <p
+                <input
+                  type="text"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  placeholder="Enter phone number"
+                  required
+                  disabled={otpVerified}
                   className="
-                    mt-1
+                    w-full
+                    rounded
+                    border
+                    border-gray-300
+                    p-3
+                    outline-none
+                    focus:border-[#087f9d]
+                    disabled:bg-gray-100
+                  "
+                />
+
+                <button
+                  type="button"
+                  onClick={handleSendOtp}
+                  disabled={otpSending || otpVerified}
+                  className="
+                    whitespace-nowrap
+                    rounded
+                    bg-[#087f9d]
+                    px-4
+                    py-3
                     text-sm
-                    text-red-600
+                    font-semibold
+                    text-white
+                    hover:bg-[#075d72]
+                    disabled:cursor-not-allowed
+                    disabled:opacity-60
                   "
                 >
-                  {phoneError}
-                </p>
+                  {otpVerified
+                    ? "Verified"
+                    : otpSending
+                    ? "Sending..."
+                    : otpSent
+                    ? "Resend OTP"
+                    : "Send OTP"}
+                </button>
 
-              )}
-
-
-              {/* Character counter */}
-
-              <p
-                className={`
-                  mt-1
-                  text-xs
-                  ${
-                    formData.phone.length === 10
-                      ? "text-green-600"
-                      : "text-gray-500"
-                  }
-                `}
-              >
-                {formData.phone.length}/10 digits
-
-                {formData.phone.length === 10 &&
-                  " ✓"}
-              </p>
+              </div>
 
             </div>
 
 
-            {/* =================================
-                DOCTOR
-            ================================== */}
+            {otpSent && !otpVerified && (
+
+              <div>
+
+                <label className="mb-2 block text-sm font-semibold">
+                  Enter OTP
+                </label>
+
+                <div className="flex gap-2">
+
+                  <input
+                    type="text"
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value)}
+                    placeholder="6-digit code"
+                    maxLength={6}
+                    className="
+                      w-full
+                      rounded
+                      border
+                      border-gray-300
+                      p-3
+                      outline-none
+                      focus:border-[#087f9d]
+                    "
+                  />
+
+                  <button
+                    type="button"
+                    onClick={handleVerifyOtp}
+                    disabled={otpVerifying}
+                    className="
+                      whitespace-nowrap
+                      rounded
+                      bg-green-600
+                      px-4
+                      py-3
+                      text-sm
+                      font-semibold
+                      text-white
+                      hover:bg-green-700
+                      disabled:cursor-not-allowed
+                      disabled:opacity-60
+                    "
+                  >
+                    {otpVerifying ? "Verifying..." : "Verify"}
+                  </button>
+
+                </div>
+
+              </div>
+
+            )}
+
+
+            {(otpError || otpMessage) && (
+
+              <div className="md:col-span-2">
+
+                {otpError && (
+                  <p className="text-sm font-medium text-red-600">
+                    {otpError}
+                  </p>
+                )}
+
+                {!otpError && otpMessage && (
+                  <p className="text-sm font-medium text-green-600">
+                    {otpMessage}
+                  </p>
+                )}
+
+              </div>
+
+            )}
+
 
             <Select
               label="Select Doctor"
@@ -727,10 +412,6 @@ function Appointment() {
             />
 
 
-            {/* =================================
-                HOSPITAL
-            ================================== */}
-
             <Select
               label="Select Hospital"
               name="hospital"
@@ -744,10 +425,6 @@ function Appointment() {
             />
 
 
-            {/* =================================
-                DATE
-            ================================== */}
-
             <Input
               label="Date"
               name="date"
@@ -756,10 +433,6 @@ function Appointment() {
               onChange={handleChange}
             />
 
-
-            {/* =================================
-                TIME
-            ================================== */}
 
             <Input
               label="Time"
@@ -770,23 +443,11 @@ function Appointment() {
             />
 
 
-            {/* =================================
-                MESSAGE
-            ================================== */}
-
             <div className="md:col-span-2">
 
-              <label
-                className="
-                  mb-2
-                  block
-                  text-sm
-                  font-semibold
-                "
-              >
+              <label className="mb-2 block text-sm font-semibold">
                 Message
               </label>
-
 
               <textarea
                 name="message"
@@ -810,24 +471,9 @@ function Appointment() {
           </div>
 
 
-          {/* ===================================
-              BOOK APPOINTMENT
-          ==================================== */}
-
           <button
             type="submit"
-            disabled={
-              submitting ||
-              !otpVerified ||
-              formData.phone.length !== 10
-            }
-            title={
-              !otpVerified
-                ? "Verify your email with the OTP first"
-                : formData.phone.length !== 10
-                ? "Enter a 10-digit mobile number"
-                : undefined
-            }
+            disabled={submitting || !otpVerified}
             className="
               mt-6
               rounded
@@ -843,6 +489,8 @@ function Appointment() {
           >
             {submitting
               ? "BOOKING..."
+              : !otpVerified
+              ? "VERIFY PHONE TO BOOK"
               : "BOOK APPOINTMENT"}
           </button>
 
@@ -855,10 +503,6 @@ function Appointment() {
 }
 
 
-/* =========================================
-   INPUT COMPONENT
-========================================= */
-
 function Input({
   label,
   name,
@@ -869,20 +513,11 @@ function Input({
 }) {
 
   return (
-
     <div>
 
-      <label
-        className="
-          mb-2
-          block
-          text-sm
-          font-semibold
-        "
-      >
+      <label className="mb-2 block text-sm font-semibold">
         {label}
       </label>
-
 
       <input
         type={type}
@@ -903,14 +538,9 @@ function Input({
       />
 
     </div>
-
   );
 }
 
-
-/* =========================================
-   SELECT COMPONENT
-========================================= */
 
 function Select({
   label,
@@ -921,20 +551,11 @@ function Select({
 }) {
 
   return (
-
     <div>
 
-      <label
-        className="
-          mb-2
-          block
-          text-sm
-          font-semibold
-        "
-      >
+      <label className="mb-2 block text-sm font-semibold">
         {label}
       </label>
-
 
       <select
         name={name}
@@ -957,7 +578,6 @@ function Select({
           Select {label}
         </option>
 
-
         {options.map((option) => (
 
           <option
@@ -972,9 +592,7 @@ function Select({
       </select>
 
     </div>
-
   );
 }
-
 
 export default Appointment;
