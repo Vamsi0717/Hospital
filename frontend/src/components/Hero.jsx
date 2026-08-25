@@ -74,7 +74,7 @@ function Hero() {
         backgroundImage: `
           linear-gradient(
             rgba(0,135,165,.70),
-            rgba(0,135,165,.70)
+            rgba(140, 165, 0, 0.7)
           ),
           url(${slide.image})
         `,

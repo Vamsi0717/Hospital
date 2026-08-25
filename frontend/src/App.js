@@ -23,6 +23,8 @@ import About from "./pages/About";
 import Contact from "./pages/Contact";
 import Payment from "./pages/Payment";
 import HospitalDetail from "./pages/HospitalDetail";
+import InternationalPatients from "./pages/InternationalPatients";
+import Resources from "./pages/Resources";
 
 function App() {
   return (
@@ -82,6 +84,22 @@ function App() {
           path="/hospitals/:id"
           element={<HospitalDetail />}
         />
+
+        <Route
+          path="/international-patients"
+          element={<InternationalPatients />}
+        />
+
+
+        <Route
+          path="/resources"
+          element={<Resources />}
+        />
+
+        
+
+
+
       </Routes>
 
 

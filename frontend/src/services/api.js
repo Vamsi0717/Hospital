@@ -28,4 +28,14 @@ export const getHospitalById = (id) => {
   return API.get(`/hospitals/${id}/`);
 };
 
+
+
+export const sendOtp = (email) => {
+  return API.post("/otp/send/", { email });
+};
+
+export const verifyOtp = (email, code) => {
+  return API.post("/otp/verify/", { email, code });
+};
+
 export default API;
