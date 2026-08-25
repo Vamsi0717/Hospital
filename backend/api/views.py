@@ -1,8 +1,24 @@
+import logging
+import random
+from datetime import timedelta
+
+from django.core import signing
+from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .tasks import schedule_auto_confirm
+
+logger = logging.getLogger(__name__)
+
+# Salt namespaces the signed token so it can't be reused for anything else
+# this project might sign later; max_age (in AppointmentListCreateView.create)
+# is how long a verified OTP stays usable for booking.
+OTP_TOKEN_SALT = "api.otp-verification"
+OTP_VALID_MINUTES = 5
+OTP_TOKEN_MAX_AGE_SECONDS = 15 * 60
+
 
 def _flatten_errors(error_detail):
     """Turn DRF's {field: [msg, ...]} error dict into a flat list of strings."""
@@ -12,13 +28,15 @@ def _flatten_errors(error_detail):
             details.append(f"{field}: {message}" if field != "non_field_errors" else str(message))
     return details
 
-from .models import Appointment, Doctor, HealthPackage, Hospital
+from .models import Appointment, Doctor, HealthPackage, Hospital, OTPVerification
 from .serializers import (
     AppointmentSerializer,
     AppointmentStatusSerializer,
     DoctorSerializer,
     HealthPackageSerializer,
     HospitalSerializer,
+    OTPSendSerializer,
+    OTPVerifySerializer,
 )
 
 
@@ -128,6 +146,25 @@ class AppointmentListCreateView(generics.ListCreateAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        email = serializer.validated_data.get("email", "")
+        otp_token = serializer.validated_data.get("otp_token", "")
+
+        try:
+            payload = signing.loads(
+                otp_token, salt=OTP_TOKEN_SALT, max_age=OTP_TOKEN_MAX_AGE_SECONDS
+            )
+        except signing.BadSignature:
+            payload = None
+
+        if not payload or payload.get("email", "").lower() != email.lower():
+            return Response(
+                {
+                    "error": "Validation failed",
+                    "details": ["email: Please verify this email with an OTP before booking."],
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         appointment = serializer.save()
 
         schedule_auto_confirm(appointment.id, 10)
@@ -177,6 +214,93 @@ class AppointmentStatusUpdateView(APIView):
         serializer.save()
 
         return Response(AppointmentSerializer(appointment).data)
+
+
+# OTP verification
+
+class OTPSendView(APIView):
+    """
+    POST /api/otp/send/  body: {"email": "..."}
+    Generates a 6-digit code and prints it to the Django server terminal
+    (no email/SMS provider needed in dev).
+    """
+
+    def post(self, request):
+        serializer = OTPSendSerializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except ValidationError:
+            return Response(
+                {"error": "Validation failed", "details": _flatten_errors(serializer.errors)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        email = serializer.validated_data["email"]
+
+        # Invalidate any earlier unverified codes for this email.
+        OTPVerification.objects.filter(email__iexact=email, is_verified=False).delete()
+
+        code = f"{random.randint(0, 999999):06d}"
+        OTPVerification.objects.create(
+            email=email,
+            code=code,
+            expires_at=timezone.now() + timedelta(minutes=OTP_VALID_MINUTES),
+        )
+
+        banner = "=" * 50
+        print(f"\n{banner}\nOTP for {email}: {code}\n(valid for {OTP_VALID_MINUTES} minutes)\n{banner}\n")
+        logger.info("OTP for %s: %s", email, code)
+
+        return Response(
+            {"message": f"OTP sent. Check the Django server terminal (valid {OTP_VALID_MINUTES} min)."},
+            status=status.HTTP_200_OK,
+        )
+
+
+class OTPVerifyView(APIView):
+    """
+    POST /api/otp/verify/  body: {"email": "...", "code": "123456"}
+    Returns a short-lived signed token to include as `otp_token` when
+    creating the appointment.
+    """
+
+    def post(self, request):
+        serializer = OTPVerifySerializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except ValidationError:
+            return Response(
+                {"error": "Validation failed", "details": _flatten_errors(serializer.errors)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        email = serializer.validated_data["email"]
+        code = serializer.validated_data["code"]
+
+        otp = (
+            OTPVerification.objects.filter(email__iexact=email, is_verified=False)
+            .order_by("-created_at")
+            .first()
+        )
+
+        if not otp or otp.is_expired:
+            return Response(
+                {"error": "Validation failed", "details": ["code: No active OTP found. Please request a new one."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if otp.code != code:
+            return Response(
+                {"error": "Validation failed", "details": ["code: Incorrect OTP."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        otp.is_verified = True
+        otp.save(update_fields=["is_verified"])
+
+        token = signing.dumps({"email": email}, salt=OTP_TOKEN_SALT)
+
+        return Response({"message": "Email verified.", "otp_token": token}, status=status.HTTP_200_OK)
 
 
 # Health check

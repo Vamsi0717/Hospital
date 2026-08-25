@@ -82,6 +82,7 @@ function App() {
           path="/hospitals/:id"
           element={<HospitalDetail />}
         />
+
       </Routes>
 
 

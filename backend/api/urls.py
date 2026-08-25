@@ -5,6 +5,9 @@ from . import views
 urlpatterns = [
     path("health/", views.HealthCheckView.as_view(), name="health-check"),
 
+    path("otp/send/", views.OTPSendView.as_view(), name="otp-send"),
+    path("otp/verify/", views.OTPVerifyView.as_view(), name="otp-verify"),
+
     path("doctors/", views.DoctorListView.as_view(), name="doctor-list"),
     path("doctors/<int:pk>/", views.DoctorDetailView.as_view(), name="doctor-detail"),
 

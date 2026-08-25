@@ -1,5 +1,6 @@
 from django.core.validators import RegexValidator
 from django.db import models
+from django.utils import timezone
 
 
 class Doctor(models.Model):
@@ -71,3 +72,23 @@ class Appointment(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.doctor} ({self.date})"
+
+
+class OTPVerification(models.Model):
+    """One-time password issued to an email before it can book an appointment."""
+
+    email = models.EmailField()
+    code = models.CharField(max_length=6)
+    is_verified = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.email} - {self.code} ({'verified' if self.is_verified else 'pending'})"
+
+    @property
+    def is_expired(self):
+        return timezone.now() > self.expires_at
